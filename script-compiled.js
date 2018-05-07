@@ -9,25 +9,27 @@ var Rule = function () {
 		_classCallCheck(this, Rule);
 	}
 
-	_createClass(Rule, [{
+	_createClass(Rule, null, [{
 		key: 'isRequired',
 		value: function isRequired(data) {
 			return data != '';
 		}
 	}, {
 		key: 'isEmail',
-		value: function isEmail() {}
+		value: function isEmail(data) {
+			var emailRegex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+			return emailRegex.test(data) === true;
+		}
 	}, {
-		key: 'isMin',
-		value: function isMin() {}
-	}, {
-		key: 'isMax',
-		value: function isMax() {}
+		key: 'isSizeBetween',
+		value: function isSizeBetween(data, min, max) {
+			return data.length <= max && data >= min;
+		}
 	}]);
 
 	return Rule;
 }();
-"use strict";
+'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -36,60 +38,81 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 var Validator = function () {
 	function Validator() {
 		_classCallCheck(this, Validator);
-
-		this.rule = new Rule();
-		this.errors = [];
 	}
 
 	_createClass(Validator, [{
-		key: "validate",
+		key: 'validate',
 		value: function validate(dataSubmit) {
-			return this.errors.push(this.matchWithRules(dataSubmit));
+			return this.matchWithRules(dataSubmit);
 		}
 	}, {
-		key: "matchWithRules",
+		key: 'matchWithRules',
 		value: function matchWithRules(dataSubmit) {
-			var _this = this;
-
-			var _loop = function _loop(key) {
-				var dataObj = dataSubmit[key];
-				var rules = _this.extractRules(dataObj.rules);
-				rules.forEach(function (rule) {
-					switch (rule) {
-						case "required":
-							{
-								this.rule.isRequired(dataObj.value);
-								break;
-							}
-						case "email":
-							{
-								this.rule.isEmail(dataObj.value);
-								break;
-							}
-						default:
-							{
-								console.err('Rule not found');
-							}
-					}
-				});
-			};
+			var errors = [];
 
 			for (var key in dataSubmit) {
-				_loop(key);
+				var dataObj = dataSubmit[key];
+				var rules = this.extractRules(dataObj.rules);
+
+				for (var _key in rules) {
+					if (rules[_key] === 'required' && !Rule.isRequired(dataObj.value)) {
+						var validated = {
+							selector: dataObj.selector,
+							message: 'this is required'
+						};
+						errors.push(validated);
+						break;
+					}
+					if (rules[_key] === 'email' && !Rule.isEmail(dataObj.value)) {
+						var _validated = {
+							selector: dataObj.selector,
+							message: 'this should be a valid email format'
+						};
+						errors.push(_validated);
+						break;
+					}
+					if (rules[_key].includes('size_between:')) {
+						var ruleValue = this.extractDynamicRuleVal(rules[_key]);
+						var range = this.extractRange(ruleValue);
+						var min = range[0];
+						var max = range[1];
+
+						if (!Rule.isSizeBetween(dataObj.value, min, max)) {
+							var _validated2 = {
+								selector: dataObj.selector,
+								message: 'value should be between ' + min + ' and ' + max
+							};
+							errors.push(_validated2);
+							break;
+						}
+					}
+				}
 			}
+			return errors;
 		}
+
+		//return's an array of rules 
+
 	}, {
-		key: "extractRules",
+		key: 'extractRules',
 		value: function extractRules(ruleString) {
-			//return's an array of rules 
 			return ruleString.split('|');
 		}
+
+		//return's the value for dynamic rule
+
 	}, {
-		key: "assignErrosToField",
-		value: function assignErrosToField(key, prop) {
-			var errorObj = {};
-			errorObj[key] = key + " is required";
-			this.errors.push(errorObj);
+		key: 'extractDynamicRuleVal',
+		value: function extractDynamicRuleVal(rule) {
+			return rule.substr(rule.indexOf(':') + 1, rule.length - 1);
+		}
+
+		//return's an array min/max
+
+	}, {
+		key: 'extractRange',
+		value: function extractRange(range) {
+			return range.split(',');
 		}
 	}]);
 
